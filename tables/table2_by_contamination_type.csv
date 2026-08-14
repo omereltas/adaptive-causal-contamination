@@ -1,0 +1,31 @@
+contamination_type,method,bias,mse,rmse
+covariate,Naive IPW,-0.1211,0.0415,0.1971
+covariate,Regression Adj.,-0.1289,0.0401,0.1936
+covariate,Robust IPW,-0.1247,0.0405,0.195
+covariate,Robust DR,-0.1238,0.0433,0.2015
+covariate,Robust AIPW,-0.0999,0.0411,0.1958
+covariate,Adaptive,-0.1288,0.0405,0.1945
+mixed,Naive IPW,-0.2329,0.1509,0.3483
+mixed,Regression Adj.,-0.2472,0.1553,0.3522
+mixed,Robust IPW,-0.2244,0.0918,0.2814
+mixed,Robust DR,-0.2297,0.1006,0.2939
+mixed,Robust AIPW,-0.1818,0.0773,0.2576
+mixed,Adaptive,-0.2237,0.0937,0.2832
+none,Naive IPW,0.0093,0.0175,0.1242
+none,Regression Adj.,0.0088,0.0154,0.1172
+none,Robust IPW,-0.016,0.0178,0.1258
+none,Robust DR,0.0047,0.0169,0.1221
+none,Robust AIPW,0.0006,0.0223,0.1411
+none,Adaptive,0.0086,0.0156,0.1178
+outcome,Naive IPW,0.0098,0.2079,0.3635
+outcome,Regression Adj.,0.0094,0.1865,0.347
+outcome,Robust IPW,-0.0158,0.025,0.148
+outcome,Robust DR,0.0048,0.0247,0.1465
+outcome,Robust AIPW,0.0005,0.0277,0.1561
+outcome,Adaptive,-0.0109,0.0248,0.1469
+treatment,Naive IPW,-0.4649,0.337,0.5057
+treatment,Regression Adj.,-0.458,0.3274,0.4962
+treatment,Robust IPW,-0.4377,0.2964,0.4755
+treatment,Robust DR,-0.4297,0.2925,0.4698
+treatment,Robust AIPW,-0.379,0.242,0.4319
+treatment,Adaptive,-0.458,0.3275,0.4964
