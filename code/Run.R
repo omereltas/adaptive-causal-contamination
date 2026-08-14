@@ -1,45 +1,6 @@
 # =============================================================================
 # ADAPTIVE MONTE CARLO FRAMEWORK - PRODUCTION RUN (n_mc = 2000)
 # =============================================================================
-# BU SURUME KADAR UYGULANAN TUM DUZELTMELER:
-#   [FIX 1] beta_ps / beta_out vektorleri 11 -> 21 elemana genisletildi.
-#           (Eskiden p=20 icin sessizce NA donuyordu, tum p=20 senaryolari
-#            hic yazilmadan atlaniyordu - bu duzeltilmeden ONCE kesfedildi
-#            ve ayri bir kosuyla (run_p20_fix.R) telafi edildi.)
-#   [FIX 2] select_estimator_adaptive(): covMcd() -> guvenli IQR-tabanli
-#           outlier tespiti. moments::kurtosis() eksikse manuel fallback.
-#   [FIX 3] Checkpoint dosyasi olusturma bug'i giderildi: eskiden
-#           write.csv(data.frame(), file) ile olusturulan "bos" stub
-#           dosyasi aslinda 1 satir icerdigi (file.size>0) icin ilk
-#           gercek yazimda header HIC YAZILMIYORDU. Artik sadece
-#           file.exists() kontrolu kullaniliyor, stub dosyasi hic
-#           olusturulmuyor.
-#   [FIX 4] n_mc TUTARLILIK KONTROLU eklendi: eger checkpoint dosyasi
-#           zaten varsa ve icindeki n_mc degeri CONFIG$n_mc ile
-#           UYUSMUYORSA script DURDURULUR (eskiden sessizce n_mc=10'luk
-#           "tamamlanmis" senaryolari atlayip yanlislikla dusuk kaliteli
-#           sonuclari "nihai" sonuc olarak birakma riski vardi).
-#   [FIX 5] doRNG eklendi: paralel worker'larin RNG akislari artik
-#           bagimsiz ve tekrarlanabilir (L'Ecuyer-CMRG). Eskiden %dopar%
-#           ile worker'lar arasi RNG bagimsizligi GARANTI DEGILDI - JASA/
-#           Biometrika hakemleri bunu sorabilir, simdi guvenli.
-#
-# BILINCLI OLARAK YAPILMAYAN DEGISIKLIK:
-#   Senaryo x tekrar duzlestirme (onceden konusulan "1 numarali duzeltme")
-#   UYGULANMADI. Gerekce: n_mc=2000/3 cekirdek=666 gorev/cekirdek zaten
-#   iyi dengeleniyor (n_mc=10 iken sorun olan yuk dengesizligi artik
-#   onemsiz). 675 senaryonun ayri ayri dispatch edilmesinin ek maliyeti
-#   (birkac saniye) ~10 gunluk toplam surenin yaninda ihmal edilebilir.
-#   Test edilmis/kanitlanmis mevcut checkpoint granularitesini (senaryo
-#   bazinda) bozup riske atmaya gerek yok.
-#
-# TAHMINI SURE: ~9.9 gun (675 senaryo, gercek n_mc=10 olcumunden 200x
-# olceklenerek, 3 cekirdek - Intel i5-4460). KAPSAM DARALTILMADI.
-#
-# CALISTIRMA ONERISI: Bu scripti RStudio icinde DEGIL, komut satirindan
-# calistirin (asagida "CALISTIRMA TALIMATLARI" bolumune bakin) - gunlerce
-# surecek bir isi interaktif oturuma bagli tutmak riskli.
-# =============================================================================
 
 rm(list = ls())
 
@@ -47,16 +8,15 @@ rm(list = ls())
 # 0. CONFIGURATION
 # =============================================================================
 CONFIG <- list(
-  n_mc = 2000,                        # HEDEF: tam replikasyon sayisi
+  n_mc = 2000,                        
   n_values = c(200, 500, 1000),
   p_values = c(5, 10, 20),
   true_ate = 2.0,
   contamination_types = c("none", "covariate", "outcome", "treatment", "mixed"),
   contamination_rates = c(0, 0.05, 0.10, 0.15, 0.20),
   contamination_strengths = c(3, 5, 10),
-  n_cores = 3,                        # i5-4460: 4 fiziksel cekirdek, HT yok -> detectCores()-1=3
-  # ONEMLI: n_mc=10 test kosularindan FARKLI dosya adlari - eski checkpoint
-  # ile KARISMASIN diye. Bu isimler zaten "production" icin ayrilmis olsun.
+  n_cores = 3,                        
+ 
   checkpoint_file = "mc_checkpoint_production_nmc2000.csv",
   results_file    = "mc_results_production_nmc2000.csv",
   seed = 42,
@@ -87,7 +47,6 @@ set.seed(CONFIG$seed)
 
 # =============================================================================
 # 2. THEORETICAL SECTION: IF / ASYMPTOTIC BIAS / BREAKDOWN POINT
-#    (degismedi - orijinal kod, sadece generate_data/calc_* asagida FIXED)
 # =============================================================================
 calc_if_ipw <- function(data, perturbation_amount = NULL) {
   n <- nrow(data)
@@ -180,7 +139,7 @@ calc_breakdown_point <- function(data, method = "ipw_naive", max_epsilon = 0.5, 
     biases[i] <- ifelse(is.na(est), Inf, abs(est - true_ate))
     if (biases[i] > bias_threshold) break
   }
-  bp <- epsilons[max(which(biases[1:i] <= bias_threshold))]   # [FIX] sadece doldurulmus kismi kullan
+  bp <- epsilons[max(which(biases[1:i] <= bias_threshold))]   
   cat(sprintf("BP(%s) = %.2f\n", method, bp))
   list(breakdown_point = bp, epsilons = epsilons[1:i], biases = biases[1:i])
 }
@@ -199,7 +158,7 @@ compare_breakdown_points <- function(data) {
 }
 
 # =============================================================================
-# 3. DATA GENERATION - [FIX 1] BETA VEKTORLERI GENISLETILDI (p=20 guvenli)
+# 3. DATA GENERATION - [FIX 1]  (p=20)
 # =============================================================================
 beta_ps_base  <- c(0.5, -0.3, 0.4, -0.2, 0.1, 0.3, -0.1, 0.2, -0.15, 0.1, 0.05)
 beta_ps_extra <- c(-0.08, 0.06, -0.05, 0.04, -0.03, 0.03, -0.02, 0.02, -0.01, 0.01)
@@ -212,7 +171,7 @@ BETA_OUT_FULL  <- c(beta_out_base, beta_out_extra) # uzunluk 21
 generate_data <- function(n, p = 5, true_ate = 2.0, contamination_type = "none",
                           contamination_rate = 0.1, contamination_strength = 5.0,
                           covariate_type = "normal") {
-  stopifnot(p + 1 <= length(BETA_PS_FULL), p + 1 <= length(BETA_OUT_FULL))  # [FIX] sessiz NA yerine hata
+  stopifnot(p + 1 <= length(BETA_PS_FULL), p + 1 <= length(BETA_OUT_FULL))  
   
   Sigma <- matrix(0.3, p, p); diag(Sigma) <- 1.0
   if (covariate_type == "normal") {
@@ -262,7 +221,7 @@ generate_data <- function(n, p = 5, true_ate = 2.0, contamination_type = "none",
 }
 
 # =============================================================================
-# 4. ESTIMATORS (degismedi)
+# 4. ESTIMATORS 
 # =============================================================================
 calc_ipw_robust <- function(data, trim_lower = 0.01, trim_upper = 0.99, huber_k = 1.345) {
   ps_formula <- as.formula(paste("T ~", paste(names(data)[-(1:2)], collapse = " + ")))
@@ -380,7 +339,7 @@ select_estimator_adaptive <- function(data) {
 }
 
 # =============================================================================
-# 6. REAL DATA: LALONDE (MatchIt uyumlu, degismedi)
+# 6. REAL DATA: LALONDE 
 # =============================================================================
 load_lalonde_data <- function() {
   cat("\n--- LALONDE DATASET ---\n")
@@ -444,7 +403,7 @@ analyze_lalonde <- function() {
 }
 
 # =============================================================================
-# 7. REAL DATA: NHANES (synthetic, degismedi)
+# 7. REAL DATA: NHANES 
 # =============================================================================
 load_nhanes_data <- function() {
   cat("\n--- NHANES (Synthetic) ---\n")
@@ -506,14 +465,14 @@ estimate_time <- function(elapsed, completed, total) {
 }
 
 # =============================================================================
-# 9. PRODUCTION MC RUN - [FIX 3] header bug giderildi, [FIX 4] n_mc kontrolu
+# 9. PRODUCTION MC RUN - [FIX 3]  [FIX 4] 
 # =============================================================================
 run_monte_carlo_parallel <- function(config = CONFIG) {
   
   n_cores <- min(config$n_cores, detectCores() - 1)
   cl <- makeCluster(n_cores)
   registerDoParallel(cl)
-  if (USE_DORNG) registerDoRNG(config$seed)   # [FIX 5] bagimsiz/tekrarlanabilir RNG akislari
+  if (USE_DORNG) registerDoRNG(config$seed)   
   cat(sprintf("\n%d cekirdek kullaniliyor%s\n", n_cores, ifelse(USE_DORNG, " (doRNG aktif)", " (UYARI: doRNG YOK)")))
   
   clusterExport(cl, c("generate_data", "calc_ipw_naive", "calc_ipw_robust", "calc_dr_robust",
@@ -536,7 +495,7 @@ run_monte_carlo_parallel <- function(config = CONFIG) {
   if (file.exists(checkpoint_file)) {
     existing <- tryCatch(read.csv(checkpoint_file, stringsAsFactors = FALSE), error = function(e) NULL)
     if (!is.null(existing) && nrow(existing) > 0) {
-      # [FIX 4] KRITIK GUVENLIK KONTROLU: checkpoint farkli n_mc ile mi olusturulmus?
+      
       existing_nmc <- unique(existing$n_mc)
       if (!all(existing_nmc == config$n_mc)) {
         stop(sprintf(paste0("DURDURULDU: '%s' dosyasindaki checkpoint n_mc=%s ile olusturulmus, ",
@@ -631,7 +590,7 @@ run_monte_carlo_parallel <- function(config = CONFIG) {
 }
 
 # =============================================================================
-# 10. VISUALIZATION (degismedi)
+# 10. VISUALIZATION 
 # =============================================================================
 plot_performance <- function(results) {
   p1 <- ggplot(results, aes(x = factor(contamination_rate), y = mse, fill = method)) +
@@ -706,16 +665,3 @@ print(summary_table)
 cat("\n", rep("=", 70), "\n", sep = "")
 cat("PRODUCTION RUN TAMAMLANDI\n")
 cat(rep("=", 70), "\n", sep = "")
-
-# =============================================================================
-# CALISTIRMA TALIMATLARI (script disinda, sadece bilgi amacli)
-# =============================================================================
-# Windows'ta komut satirindan (RStudio DEGIL) calistirmak icin:
-#   1) Komut Istemi / PowerShell acin, script'in oldugu klasore gidin
-#   2) "C:\Program Files\R\R-4.x.x\bin\Rscript.exe" production_run.R > production_log.txt 2>&1
-#   3) Guc Secenekleri > Uyku/Ekran kapanmasi -> "Asla" yapin
-#   4) Ilerlemeyi kontrol etmek icin production_log.txt dosyasini herhangi
-#      bir zamanda acip son satirlara bakabilirsiniz (dosya surekli guncellenir)
-#   5) Kesinti olursa (elektrik, yeniden baslatma vb.) AYNI KOMUTU tekrar
-#      calistirmaniz yeterli - checkpoint kaldigi yerden devam eder
-#      (test edildi, dogrulandi).
